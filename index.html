@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PICKPOCKET — DualSense demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0d0f12; --panel:#15181d; --edge:#262b33; --txt:#cfd6e0; --dim:#6b7482;
+    --accent:#e8b13c; --good:#4cd17a; --bad:#e0524c; --info:#4ca8e0; --purple:#b06ae0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "SF Mono",Menlo,Consolas,monospace;padding:14px}
+  h1{font-size:18px;margin:0;letter-spacing:3px;color:var(--accent)}
+  h2{font-size:11px;margin:0 0 8px;color:var(--dim);letter-spacing:2px;text-transform:uppercase}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+  button{background:#1d222a;color:var(--txt);border:1px solid var(--edge);border-radius:6px;
+    padding:7px 14px;font:inherit;cursor:pointer}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button:disabled{opacity:.4;cursor:default}
+  button.primary{border-color:var(--accent);color:var(--accent)}
+  .pill{padding:3px 10px;border-radius:20px;border:1px solid var(--edge);font-size:12px;color:var(--dim)}
+  .pill.on{border-color:var(--good);color:var(--good)}
+  .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:12px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:12px}
+  #stage{min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative}
+  #stateTag{position:absolute;top:10px;left:12px;font-size:11px;color:var(--dim);letter-spacing:2px}
+  #policeTag{position:absolute;top:10px;right:12px;font-size:11px;color:var(--dim)}
+  #policeTag.hot{color:var(--bad);font-weight:bold}
+  #prompt{font-size:26px;min-height:76px;display:flex;align-items:center;justify-content:center;gap:10px;white-space:pre-line}
+  #subprompt{color:var(--dim);min-height:22px;margin-top:2px}
+  #timerWrap{width:70%;height:8px;background:#0a0c0e;border-radius:4px;margin-top:16px;overflow:hidden}
+  #timerBar{height:100%;width:0%;background:var(--accent);transition:none}
+  .arrow{font-size:44px}
+  .statrow{display:flex;gap:16px;margin-top:14px;color:var(--dim);font-size:12px}
+  .statrow b{color:var(--txt)}
+  .padrow{display:flex;gap:14px;align-items:center;justify-content:space-around;flex-wrap:wrap}
+  canvas.stick{background:#0a0c0e;border:1px solid var(--edge);border-radius:8px}
+  .trig{width:26px;height:110px;background:#0a0c0e;border:1px solid var(--edge);border-radius:6px;position:relative;overflow:hidden}
+  .trig>div{position:absolute;bottom:0;left:0;width:100%;background:var(--info)}
+  .trig.stiff>div{background:var(--bad)}
+  .trigwrap{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--dim)}
+  #lootList{list-style:none;margin:0;padding:0;max-height:150px;overflow:auto;font-size:13px}
+  #lootList li{padding:2px 0;border-bottom:1px dashed #20242b}
+  #lootTotal{color:var(--accent);font-size:18px;margin-top:6px}
+  #slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+  .slot{border:1px solid var(--edge);border-radius:8px;padding:8px;font-size:12px}
+  .slot label{display:block;color:var(--txt);margin-bottom:4px}
+  .slot .src{color:var(--dim)}
+  .slot .src.file{color:var(--good)}
+  .slot input{width:100%;font-size:11px;color:var(--dim);margin-top:4px}
+  #log{height:130px;overflow:auto;font-size:12px;color:var(--dim);background:#0a0c0e;
+    border-radius:6px;padding:8px;margin-top:6px}
+  #log .t{color:#3d4450;margin-right:6px}
+  #log .hl{color:var(--accent)}
+  #overlay{position:fixed;inset:0;background:rgba(5,6,8,.88);display:none;align-items:center;justify-content:center;z-index:10}
+  #overlay .card{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:30px 40px;text-align:center}
+  #overlay h3{font-size:24px;margin:0 0 10px;letter-spacing:2px}
+  .foot{margin-top:12px;color:var(--dim);font-size:11px}
+  input[type=range]{accent-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PICKPOCKET</h1>
+  <button id="btnConnect" class="primary">Connect DualSense</button>
+  <span id="padStatus" class="pill">no controller</span>
+  <button id="btnStart" disabled>Start run</button>
+  <span style="margin-left:auto;font-size:12px;color:var(--dim)">
+    vol <input type="range" id="masterVol" min="0" max="100" value="80" style="vertical-align:middle">
+  </span>
+</header>
+
+<div class="grid">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="panel" id="stage">
+      <span id="stateTag">BOOT</span>
+      <span id="policeTag">police: far</span>
+      <div id="prompt">Connect your controller</div>
+      <div id="subprompt">Chrome/Edge · USB or Bluetooth</div>
+      <div id="timerWrap"><div id="timerBar"></div></div>
+      <div class="statrow">
+        <span>picks <b id="stPicks">0</b></span>
+        <span>escapes <b id="stEscapes">0</b></span>
+        <span>chase <b id="stChase">—</b></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Audio slots — drop your files in (synth fallback until then)</h2>
+      <div id="slots"></div>
+      <div class="foot">Auto-loads from <b>assets/&lt;id&gt;.wav|mp3|ogg|m4a</b> next to this file (e.g. assets/crowd.mp3).
+        Narrator + police voice use browser speech synthesis; "heystop" can be replaced by a file.</div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="panel">
+      <h2>Controller debug</h2>
+      <div class="padrow">
+        <div class="trigwrap"><div class="trig" id="trigL2"><div></div></div>L2</div>
+        <div style="text-align:center">
+          <canvas class="stick" id="cvL" width="110" height="110"></canvas>
+          <div style="font-size:11px;color:var(--dim)">left stick</div>
+        </div>
+        <div style="text-align:center">
+          <canvas class="stick" id="cvR" width="110" height="110"></canvas>
+          <div style="font-size:11px;color:var(--dim)">right stick</div>
+        </div>
+        <div class="trigwrap"><div class="trig" id="trigR2"><div></div></div>R2</div>
+      </div>
+      <div class="foot" id="hidInfo">—</div>
+    </div>
+    <div class="panel">
+      <h2>Loot</h2>
+      <ul id="lootList"></ul>
+      <div id="lootTotal">$0</div>
+    </div>
+    <div class="panel">
+      <h2>Log</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay"><div class="card">
+  <h3 id="ovTitle">BUSTED</h3>
+  <div id="ovBody" style="color:var(--dim);margin-bottom:18px"></div>
+  <button id="btnAgain" class="primary">New run</button>
+</div></div>
+
+<div class="foot">Serve over http://localhost or https for WebHID · works in Chrome & Edge on macOS · DualSense / DualSense Edge</div>
+
+<script>
+"use strict";
+/* ============================================================
+   PICKPOCKET — DualSense WebHID demo
+   - WebHID driver: input parsing (USB + Bluetooth), rumble,
+     adaptive triggers, lightbar
+   - Web Audio: spatial (stereo-panned) cues, synth fallbacks,
+     user-supplied file slots
+   ============================================================ */
+
+/* ---------- tiny helpers ---------- */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const lerp = (a,b,t) => a + (b-a)*t;
+const rand = (a,b) => a + Math.random()*(b-a);
+const now = () => performance.now()/1000;
+
+const logEl = $('log');
+function log(msg, hl){
+  const d = document.createElement('div');
+  const t = new Date().toLocaleTimeString([], {hour12:false});
+  d.innerHTML = `<span class="t">${t}</span><span${hl?' class="hl"':''}></span>`;
+  d.lastChild.textContent = msg;
+  logEl.prepend(d);
+  while (logEl.childNodes.length > 80) logEl.lastChild.remove();
+}
+
+/* ============================================================
+   DualSense over WebHID
+   ============================================================ */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n=0; n<256; n++){
+    let c = n;
+    for (let k=0; k<8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for (let i=0; i<bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+const TRIG = { OFF:0x00, RIGID:0x01 };  // trigger effect modes we use
+
+class DualSense {
+  constructor(){
+    this.device = null;
+    this.bt = false;
+    this.seq = 0;
+    this.connected = false;
+    // parsed input
+    this.in = { lx:0, ly:0, rx:0, ry:0, l2:0, r2:0, btn:{} };
+    // desired output state
+    this.out = {
+      ml:0, mr:0,                       // motors 0..1 (ml = left grip / low freq)
+      lt:[TRIG.OFF,0,0], rt:[TRIG.OFF,0,0],
+      r:0, g:90, b:140
+    };
+    this._lastSent = '';
+    this._lastTime = 0;
+    this.onchange = null;
+  }
+
+  async connect(){
+    const devices = await navigator.hid.requestDevice({ filters: [
+      { vendorId:0x054C, productId:0x0CE6 },   // DualSense
+      { vendorId:0x054C, productId:0x0DF2 },   // DualSense Edge
+    ]});
+    if (!devices.length) throw new Error('no device chosen');
+    this.device = devices[0];
+    if (!this.device.opened) await this.device.open();
+
+    // USB descriptor exposes output report 0x02; Bluetooth uses 0x31.
+    const outIds = new Set();
+    for (const col of this.device.collections)
+      for (const r of (col.outputReports || [])) outIds.add(r.reportId);
+    this.bt = !outIds.has(0x02);
+
+    // Feature report 0x05 (calibration). On Bluetooth this also flips the
+    // controller from simplified (9-byte) reports to full 0x31 reports.
+    try { await this.device.receiveFeatureReport(0x05); } catch(e) {}
+
+    this.device.addEventListener('inputreport', e => this._onReport(e));
+    navigator.hid.addEventListener('disconnect', e => {
+      if (e.device === this.device){ this.connected = false; this.onchange && this.onchange(); }
+    });
+
+    this.connected = true;
+    this._loop = setInterval(() => this._flush(), 33); // ~30 Hz output
+    this._flush(true);
+    this.onchange && this.onchange();
+  }
+
+  _onReport(e){
+    const d = e.data;
+    let o;
+    if (e.reportId === 0x01){
+      if (d.byteLength < 10){ // simplified BT report (pre-enhanced) — sticks only
+        this.in.lx = (d.getUint8(0)-128)/128; this.in.ly = (d.getUint8(1)-128)/128;
+        this.in.rx = (d.getUint8(2)-128)/128; this.in.ry = (d.getUint8(3)-128)/128;
+        return;
+      }
+      o = 0;                     // USB full report
+    } else if (e.reportId === 0x31){
+      o = 1;                     // BT enhanced report: payload shifted by 1
+    } else return;
+
+    const g = i => d.getUint8(i + o);
+    const t = this.in;
+    t.lx = (g(0)-128)/128;  t.ly = (g(1)-128)/128;
+    t.rx = (g(2)-128)/128;  t.ry = (g(3)-128)/128;
+    t.l2 = g(4)/255;        t.r2 = g(5)/255;
+    const b1 = g(7), b2 = g(8), b3 = g(9);
+    t.btn = {
+      square:!!(b1&0x10), cross:!!(b1&0x20), circle:!!(b1&0x40), triangle:!!(b1&0x80),
+      dpad: b1 & 0x0F,
+      l1:!!(b2&0x01), r1:!!(b2&0x02), l2:!!(b2&0x04), r2:!!(b2&0x08),
+      create:!!(b2&0x10), options:!!(b2&0x20), l3:!!(b2&0x40), r3:!!(b2&0x80),
+      ps:!!(b3&0x01), touchpad:!!(b3&0x02),
+    };
+  }
+
+  /* 47-byte common output block (shared by USB and BT reports) */
+  _common(){
+    const f = new Uint8Array(47);
+    const o = this.out;
+    f[0] = 0x0F;              // enable rumble (compat) + haptics + both trigger effects
+    f[1] = 0x14;              // enable lightbar + player LEDs
+    f[2] = Math.round(clamp(o.mr,0,1)*255);   // right grip motor
+    f[3] = Math.round(clamp(o.ml,0,1)*255);   // left grip motor
+    f[10] = o.rt[0]; f[11] = o.rt[1]; f[12] = o.rt[2];   // right trigger effect
+    f[21] = o.lt[0]; f[22] = o.lt[1]; f[23] = o.lt[2];   // left trigger effect
+    f[38] = 0x02 | 0x04;      // lightbar-setup valid + improved rumble (new firmware)
+    f[41] = 0x02;             // lightbar setup: enable LED
+    f[42] = 0x00;             // brightness: high
+    f[43] = 0x04;             // player LED: center
+    f[44] = o.r; f[45] = o.g; f[46] = o.b;
+    return f;
+  }
+
+  async _flush(force){
+    if (!this.connected || !this.device) return;
+    const common = this._common();
+    const key = common.join(',');
+    const t = now();
+    if (!force && key === this._lastSent && t - this._lastTime < 0.5) return;
+    this._lastSent = key; this._lastTime = t;
+    try {
+      if (!this.bt){
+        await this.device.sendReport(0x02, common);
+      } else {
+        const data = new Uint8Array(77);
+        data[0] = (this.seq++ & 0x0F) << 4;    // sequence tag
+        data[1] = 0x10;                        // output tag
+        data.set(common, 2);
+        const crcSrc = new Uint8Array(75);
+        crcSrc[0] = 0xA2; crcSrc[1] = 0x31;
+        crcSrc.set(data.subarray(0, 73), 2);
+        const c = crc32(crcSrc);
+        data[73] =  c        & 0xFF;
+        data[74] = (c >>> 8) & 0xFF;
+        data[75] = (c >>>16) & 0xFF;
+        data[76] = (c >>>24) & 0xFF;
+        await this.device.sendReport(0x31, data);
+      }
+    } catch(e){ /* transient send errors are fine */ }
+  }
+
+  rumble(left, right){ this.out.ml = left; this.out.mr = right; }
+  /* side: 'l'|'r' ; stiff: full-resistance rigid effect, else free */
+  triggerStiff(side, stiff){
+    const eff = stiff ? [TRIG.RIGID, 0, 255] : [TRIG.OFF, 0, 0];
+    if (side === 'l') this.out.lt = eff; else this.out.rt = eff;
+  }
+  triggersOff(){ this.out.lt = [TRIG.OFF,0,0]; this.out.rt = [TRIG.OFF,0,0]; }
+  lightbar(r,g,b){ this.out.r = r|0; this.out.g = g|0; this.out.b = b|0; }
+}
+
+/* ============================================================
+   Audio engine — file slots with synth fallbacks
+   ============================================================ */
+const SLOT_DEFS = [
+  { id:'crowd',   label:'Crowd ambience', loop:true  },
+  { id:'jingle',  label:'Coin jingle (NPC)', loop:true },
+  { id:'boots',   label:'Police boots', loop:true },
+  { id:'crisis',  label:'Chase music (crisis theme)', loop:true },
+  { id:'bump',    label:'Bump thud' },
+  { id:'unlock',  label:'Latch found cue' },
+  { id:'success', label:'Pickpocket success' },
+  { id:'shove',   label:'Shove / fail' },
+  { id:'heystop', label:'"Hey! Stop!" shout' },
+  { id:'arrest',  label:'Arrest' },
+  { id:'escape',  label:'Escape sting' },
+];
+
+class AudioEngine {
+  constructor(){ this.ctx = null; this.buffers = {}; this._pending = {}; }
+
+  /* Try to prefetch ./assets/<slotid>.(wav|mp3|ogg|m4a) at page load.
+     Decoding happens later in init() once the AudioContext exists. */
+  async prefetchAssets(onFound){
+    for (const s of SLOT_DEFS){
+      for (const ext of ['wav','mp3','ogg','m4a']){
+        try {
+          const res = await fetch(`assets/${s.id}.${ext}`);
+          if (!res.ok) continue;
+          const type = res.headers.get('content-type') || '';
+          if (type.includes('text/html')) continue;   // SPA-style 404 pages
+          this._pending[s.id] = { ab: await res.arrayBuffer(), name:`assets/${s.id}.${ext}` };
+          onFound && onFound(s.id, this._pending[s.id].name);
+          break;
+        } catch(e){ /* file not there — synth fallback */ }
+      }
+    }
+  }
+
+  async _decodePending(){
+    for (const [id, p] of Object.entries(this._pending)){
+      try { this.buffers[id] = await this.ctx.decodeAudioData(p.ab); }
+      catch(e){ log(`Could not decode ${p.name} — using synth.`); }
+    }
+    this._pending = {};
+  }
+
+  init(){
+    if (this.ctx) { this.ctx.resume(); return; }
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0.8;
+    this.master.connect(this.ctx.destination);
+    // shared noise buffer (2 s of soft brown-ish noise)
+    const len = this.ctx.sampleRate * 2;
+    this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const ch = this.noiseBuf.getChannelData(0);
+    let last = 0;
+    for (let i=0; i<len; i++){
+      const w = Math.random()*2 - 1;
+      last = (last + 0.02*w) / 1.02;
+      ch[i] = last * 3.5;
+    }
+    this._decodePending();
+  }
+  setMaster(v){ if (this.master) this.master.gain.value = v; }
+
+  async loadFile(id, file){
+    const ab = await file.arrayBuffer();
+    this.buffers[id] = await this.ctx.decodeAudioData(ab);
+  }
+
+  _chan(pan, vol){
+    const g = this.ctx.createGain(); g.gain.value = vol;
+    const p = this.ctx.createStereoPanner(); p.pan.value = clamp(pan,-1,1);
+    g.connect(p); p.connect(this.master);
+    return { g, p };
+  }
+
+  /* Returns a handle: {setPan, setVol, stop}. Loop slots keep running
+     until stopped; one-shots stop themselves. */
+  play(id, { pan=0, vol=1, loop=false } = {}){
+    const ctx = this.ctx;
+    const { g, p } = this._chan(pan, vol);
+    const handle = {
+      setPan: v => { p.pan.setTargetAtTime(clamp(v,-1,1), ctx.currentTime, 0.05); },
+      setVol: v => { g.gain.setTargetAtTime(Math.max(0,v), ctx.currentTime, 0.05); },
+      stop: () => {
+        g.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+        setTimeout(() => { handle._cleanup && handle._cleanup(); try{ p.disconnect(); }catch(e){} }, 400);
+      },
+      _cleanup: null,
+    };
+    const buf = this.buffers[id];
+    if (buf){
+      const src = ctx.createBufferSource();
+      src.buffer = buf; src.loop = loop;
+      src.connect(g); src.start();
+      handle._cleanup = () => { try{ src.stop(); }catch(e){} };
+    } else {
+      this._synth(id, g, handle, loop);
+    }
+    return handle;
+  }
+
+  /* --- synth building blocks --- */
+  _ping(dest, t, freq, dur, type='triangle', vol=1){
+    const o = this.ctx.createOscillator(), e = this.ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    e.gain.setValueAtTime(vol, t);
+    e.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(e); e.connect(dest);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  _noiseBurst(dest, t, dur, freq, vol=1, type='bandpass'){
+    const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = 1;
+    const e = this.ctx.createGain();
+    e.gain.setValueAtTime(vol, t);
+    e.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(f); f.connect(e); e.connect(dest);
+    s.start(t); s.stop(t + dur + 0.05);
+  }
+
+  _synth(id, dest, handle, loop){
+    const ctx = this.ctx, t0 = ctx.currentTime;
+    if (id === 'crowd'){
+      // low rumble bed + midband "murmur" wobble
+      const s1 = ctx.createBufferSource(); s1.buffer = this.noiseBuf; s1.loop = true;
+      const f1 = ctx.createBiquadFilter(); f1.type='lowpass'; f1.frequency.value = 350;
+      const g1 = ctx.createGain(); g1.gain.value = 0.5;
+      s1.connect(f1); f1.connect(g1); g1.connect(dest); s1.start();
+      const s2 = ctx.createBufferSource(); s2.buffer = this.noiseBuf; s2.loop = true;
+      s2.playbackRate.value = 1.7;
+      const f2 = ctx.createBiquadFilter(); f2.type='bandpass'; f2.frequency.value = 900; f2.Q.value = 0.7;
+      const g2 = ctx.createGain(); g2.gain.value = 0.10;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.23;
+      const lg = ctx.createGain(); lg.gain.value = 0.05;
+      lfo.connect(lg); lg.connect(g2.gain); lfo.start();
+      s2.connect(f2); f2.connect(g2); g2.connect(dest); s2.start();
+      handle._cleanup = () => { [s1,s2,lfo].forEach(n=>{try{n.stop();}catch(e){}}); };
+    }
+    else if (id === 'jingle' && loop){
+      const iv = setInterval(() => {
+        if (ctx.state !== 'running') return;
+        const t = ctx.currentTime;
+        const n = 2 + (Math.random()*3|0);
+        for (let i=0; i<n; i++)
+          this._ping(dest, t + i*rand(0.03,0.08), rand(3800,7200), 0.09, 'triangle', 0.5);
+      }, 340);
+      handle._cleanup = () => clearInterval(iv);
+    }
+    else if (id === 'boots' && loop){
+      let step = 0;
+      const iv = setInterval(() => {
+        if (ctx.state !== 'running') return;
+        const t = ctx.currentTime;
+        this._ping(dest, t, 52 + (step%2)*6, 0.22, 'sine', 1.4);
+        this._noiseBurst(dest, t, 0.05, 1400, 0.25, 'highpass');
+        step++;
+      }, 560);
+      handle._cleanup = () => clearInterval(iv);
+    }
+    else if (id === 'crisis' && loop){
+      // tense driving loop: pulsing minor bassline + hat ticks + siren-ish pad
+      const BASS = [110, 110, 130.81, 110, 110, 146.83, 130.81, 123.47];
+      let step = 0;
+      const iv = setInterval(() => {
+        if (ctx.state !== 'running') return;
+        const t = ctx.currentTime;
+        this._ping(dest, t, BASS[step % 8], 0.22, 'sawtooth', 0.55);
+        this._noiseBurst(dest, t, 0.03, 6000, 0.18, 'highpass');
+        if (step % 8 === 0) this._ping(dest, t, 440, 1.6, 'triangle', 0.10);
+        if (step % 8 === 4) this._ping(dest, t, 466.16, 1.6, 'triangle', 0.10);
+        step++;
+      }, 230);
+      handle._cleanup = () => clearInterval(iv);
+    }
+    else if (id === 'bump'){
+      this._ping(dest, t0, 85, 0.18, 'sine', 1.6);
+      this._noiseBurst(dest, t0, 0.09, 500, 0.7, 'lowpass');
+    }
+    else if (id === 'unlock'){
+      this._ping(dest, t0, 1900, 0.05, 'square', 0.5);
+      this._ping(dest, t0+0.09, 2500, 0.06, 'square', 0.6);
+    }
+    else if (id === 'success'){
+      [620, 830, 1108].forEach((f,i)=> this._ping(dest, t0 + i*0.11, f, 0.22, 'triangle', 0.7));
+    }
+    else if (id === 'shove'){
+      const o = ctx.createOscillator(), e = ctx.createGain();
+      o.type='sawtooth';
+      o.frequency.setValueAtTime(320, t0);
+      o.frequency.exponentialRampToValueAtTime(70, t0+0.3);
+      e.gain.setValueAtTime(0.7, t0); e.gain.exponentialRampToValueAtTime(0.001, t0+0.35);
+      o.connect(e); e.connect(dest); o.start(t0); o.stop(t0+0.4);
+      this._noiseBurst(dest, t0, 0.2, 900, 0.6);
+    }
+    else if (id === 'heystop'){
+      // sharp whistle-ish double blast (directional cue; voice comes via TTS)
+      this._ping(dest, t0, 2300, 0.12, 'square', 0.7);
+      this._ping(dest, t0+0.15, 2300, 0.18, 'square', 0.7);
+    }
+    else if (id === 'arrest'){
+      this._ping(dest, t0, 220, 0.5, 'sawtooth', 0.5);
+      this._ping(dest, t0+0.45, 155, 0.8, 'sawtooth', 0.6);
+      this._noiseBurst(dest, t0+0.2, 0.06, 3000, 0.5, 'highpass'); // cuff click
+      this._noiseBurst(dest, t0+0.32, 0.06, 3400, 0.5, 'highpass');
+    }
+    else if (id === 'escape'){
+      const o = ctx.createOscillator(), e = ctx.createGain();
+      o.type='triangle';
+      o.frequency.setValueAtTime(240, t0);
+      o.frequency.exponentialRampToValueAtTime(960, t0+0.5);
+      e.gain.setValueAtTime(0.5, t0); e.gain.exponentialRampToValueAtTime(0.001, t0+0.6);
+      o.connect(e); e.connect(dest); o.start(t0); o.stop(t0+0.65);
+    }
+  }
+
+  /* continuous "scanning" tone for the pickpocket angle hunt */
+  scanTone(pan){
+    const ctx = this.ctx;
+    const { g, p } = this._chan(pan, 0);
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 300;
+    o.connect(g); o.start();
+    return {
+      set: (freq, vol) => {
+        o.frequency.setTargetAtTime(freq, ctx.currentTime, 0.03);
+        g.gain.setTargetAtTime(vol, ctx.currentTime, 0.03);
+      },
+      stop: () => { g.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
+                    setTimeout(()=>{try{o.stop(); p.disconnect();}catch(e){}}, 300); }
+    };
+  }
+
+  speak(text, { rate=1.05, pitch=1 } = {}){
+    if (!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = rate; u.pitch = pitch; u.volume = 1;
+    speechSynthesis.speak(u);
+  }
+}
+
+/* ============================================================
+   Game
+   ============================================================ */
+const LOOT = [
+  ['a gold pocket watch',220],['a leather wallet',60],['a diamond ring',450],
+  ['a silk handkerchief',15],['a monthly metro pass',35],['a vintage lighter',80],
+  ['an antique brooch',310],['a very unlocked phone',400],['somebody’s car keys',120],
+  ['a fountain pen',95],['two opera tickets',150],['a silver flask',130],
+  ['a bag of imported coffee',40],['a passport (uh oh)',260],
+];
+
+const ds = new DualSense();
+const au = new AudioEngine();
+
+const G = {
+  state: 'boot',           // boot | idle | approach | window | pickpocket | chase | over
+  tState: 0,               // time current state started
+  running: false,
+  side: 0,                 // -1 left, +1 right (current NPC / shout side)
+  nextNpcAt: 0,
+  // pickpocket
+  targetAngle: 0, unlocked: false, pressed: false, tUnlock: 0,
+  // chase
+  chaseRound: 0, chaseSide: 0, chasePhase: 'gap', chaseDeadline: 0, chaseNext: 0, stickArmed: true,
+  // police
+  police: { active:false, t0:0, prox:0 }, nextPoliceAt: 0,
+  // audio handles
+  hCrowd:null, hJingle:null, hBoots:null, hScan:null, hCrisis:null,
+  // score
+  loot: [], picks:0, escapes:0,
+  prevL2:0, prevR2:0,
+};
+
+const APPROACH_DUR = 5.0, WINDOW_DUR = 1.0, PICK_DUR = 5.0;
+const BURST_DUR = 0.18;   // strong haptic burst signalling "act now"
+const ANGLE_TOL = 20;          // degrees
+const CHASE_ROUNDS = 10;
+
+function setState(s){
+  G.state = s; G.tState = now();
+  $('stateTag').textContent = s.toUpperCase();
+}
+function prompt(main, sub){
+  $('prompt').innerHTML = main;
+  $('subprompt').textContent = sub || '';
+}
+function timerBar(frac, color){
+  const b = $('timerBar');
+  b.style.width = clamp(frac,0,1)*100 + '%';
+  b.style.background = color || 'var(--accent)';
+}
+function sideName(s){ return s < 0 ? 'LEFT' : 'RIGHT'; }
+function sideArrow(s){ return s < 0 ? '←' : '→'; }
+
+function scheduleNpc(){ G.nextNpcAt = now() + rand(2.5, 6.5); }
+function schedulePolice(){ G.nextPoliceAt = now() + rand(16, 32); }
+
+function startRun(){
+  au.init();
+  G.loot = []; G.picks = 0; G.escapes = 0;
+  renderLoot();
+  G.running = true;
+  if (!G.hCrowd) G.hCrowd = au.play('crowd', { loop:true, vol:0.3 });
+  scheduleNpc(); schedulePolice();
+  G.police.active = false; G.police.prox = 0;
+  ds.triggersOff();
+  setState('idle');
+  prompt('Blend in…', 'listen for jingling coins');
+  log('Run started. Listen for marks.', true);
+}
+
+function endRun(title, body){
+  G.running = false;
+  stopNpcAudio(); stopScan(); stopCrisis();
+  if (G.hBoots){ G.hBoots.stop(); G.hBoots = null; }
+  ds.rumble(0,0); ds.triggersOff(); ds.lightbar(200,20,20);
+  setState('over');
+  $('ovTitle').textContent = title;
+  $('ovBody').innerHTML = body;
+  $('overlay').style.display = 'flex';
+}
+
+function stopNpcAudio(){ if (G.hJingle){ G.hJingle.stop(); G.hJingle = null; } }
+function stopCrisis(){ if (G.hCrisis){ G.hCrisis.stop(); G.hCrisis = null; } }
+function stopScan(){ if (G.hScan){ G.hScan.stop(); G.hScan = null; } }
+
+/* ---------- NPC / approach ---------- */
+function spawnNpc(){
+  G.side = Math.random() < 0.5 ? -1 : 1;
+  stopNpcAudio();
+  G.hJingle = au.play('jingle', { loop:true, pan: G.side*0.9, vol: 0 });
+  setState('approach');
+  prompt(`♪ jingling from the <b style="color:var(--accent)">${sideName(G.side)}</b>`, 'wait… they’re getting closer');
+  log(`Mark approaching from the ${sideName(G.side).toLowerCase()}.`);
+}
+
+function npcPassed(){
+  stopNpcAudio();
+  ds.rumble(0,0);
+  setState('idle');
+  prompt('They walked past.', 'wait for the next mark');
+  log('Mark passed by untouched.');
+  scheduleNpc();
+}
+
+/* ---------- bump / pickpocket ---------- */
+function doBump(){
+  if (G.police.prox > 0.45){
+    au.speak('You’re under arrest!', {rate:1, pitch:0.7});
+    au.play('arrest');
+    log('Bumped a mark with a cop right there. Arrested.', true);
+    endRun('ARRESTED', `You picked a fight next to a police officer.<br>Final haul: <b>$${lootTotal()}</b> — confiscated.`);
+    return;
+  }
+  stopNpcAudio();
+  au.play('bump', { pan: G.side*0.5, vol: 1 });
+  ds.rumble(0.9, 0.9);
+  setTimeout(()=> ds.rumble(0,0), 160);
+  // arm the pickpocket
+  G.targetAngle = rand(0, 360);
+  G.unlocked = false; G.pressed = false;
+  ds.triggerStiff(G.side < 0 ? 'l' : 'r', true);     // bump-side trigger: stiff
+  ds.triggerStiff(G.side < 0 ? 'r' : 'l', false);
+  ds.lightbar(140, 0, 200);
+  stopScan();   // no audio hint for the angle hunt — haptics only
+  setState('pickpocket');
+  const trig = G.side < 0 ? 'L2' : 'R2';
+  prompt(`BUMP! Sweep <b>right stick</b>, feel <b>${trig}</b>`, `${trig} loosens when you find the angle`);
+  log(`Bump on the ${sideName(G.side).toLowerCase()}. Find the angle!`, true);
+}
+
+function pickSuccess(){
+  stopScan();
+  ds.triggersOff(); ds.rumble(0,0); ds.lightbar(0,90,140);
+  const [name, val] = LOOT[Math.random()*LOOT.length|0];
+  G.loot.push([name, val]); G.picks++;
+  renderLoot(); renderStats();
+  au.play('success', { vol: 0.9 });
+  setTimeout(()=> au.speak(`You lifted ${name}. Worth ${val} dollars.`, {rate:1.02}), 250);
+  setState('idle');
+  prompt(`Got it: <b style="color:var(--good)">${name}</b>`, `+$${val} — keep moving`);
+  log(`Lifted ${name} (+$${val}).`, true);
+  scheduleNpc();
+}
+
+function pickFailed(){
+  stopScan();
+  ds.triggersOff(); ds.rumble(0,0);
+  au.play('shove', { pan: G.side*0.4 });
+  log('Blown it — the mark shoved you off. RUN!', true);
+  // let the shove play out fully, then the chase (and crisis theme) begins
+  setState('shoved');
+  prompt('SHOVED!', 'they noticed…');
+  timerBar(0);
+  const shoveDur = au.buffers.shove ? au.buffers.shove.duration : 0.6;
+  setTimeout(startChase, shoveDur * 1000);
+}
+
+/* ---------- chase ---------- */
+function startChase(){
+  G.chaseRound = 0;
+  G.chasePhase = 'gap';
+  G.chaseNext = now() + 1.6;   // crisis theme runs 1-2 s before the first shout
+  G.stickArmed = false;
+  stopCrisis();
+  G.hCrisis = au.play('crisis', { loop:true, vol:0.75 });
+  ds.lightbar(220, 0, 0);
+  setState('chase');
+  prompt('RUN!', 'dodge AWAY from the shouts — 10 times');
+  renderStats();
+}
+
+function chaseShout(){
+  G.chaseSide = Math.random() < 0.5 ? -1 : 1;
+  const t = G.chaseRound / (CHASE_ROUNDS - 1);
+  const win = lerp(1.5, 0.7, t);
+  G.chaseDeadline = now() + win;
+  G.chasePhase = 'react';
+  G.stickArmed = Math.abs(ds.in.lx) < 0.3;
+  au.play('heystop', { pan: G.chaseSide*0.9, vol: 1 });
+  if (!au.buffers.heystop) au.speak('Hey! Stop!', {rate:1.4, pitch:0.8});
+  if (G.chaseSide < 0) ds.rumble(1, 0); else ds.rumble(0, 1);
+  setTimeout(()=> ds.rumble(0,0), 250);
+  prompt(`${sideArrow(-G.chaseSide)} DODGE <b>${sideName(-G.chaseSide)}</b>`,
+         `officer on your ${sideName(G.chaseSide).toLowerCase()} — ${G.chaseRound+1}/${CHASE_ROUNDS}`);
+  renderStats();
+}
+
+function chaseDodged(){
+  G.chasePhase = 'gap';
+  G.chaseRound++;
+  au.play('unlock', { pan: -G.chaseSide*0.4, vol: 0.4 });
+  if (G.chaseRound >= CHASE_ROUNDS){
+    stopCrisis();
+    au.play('escape');
+    G.escapes++;
+    ds.lightbar(0,90,140);
+    setState('idle');
+    prompt('<b style="color:var(--good)">ESCAPED</b>', 'you slip back into the crowd');
+    log('Escaped the chase!', true);
+    renderStats();
+    scheduleNpc();
+    return;
+  }
+  const t = G.chaseRound / (CHASE_ROUNDS - 1);
+  G.chaseNext = now() + lerp(1.6, 0.55, t);
+  prompt('keep running…', `${G.chaseRound}/${CHASE_ROUNDS} dodged`);
+}
+
+function chaseCaught(reason){
+  au.play('arrest');
+  log(`Caught: ${reason}`, true);
+  endRun('BUSTED', `The officer tackled you (${reason}).<br>Final haul: <b>$${lootTotal()}</b> — confiscated.`);
+}
+
+/* ---------- police patrol ---------- */
+function updatePolice(t){
+  const p = G.police;
+  if (!p.active && G.running && t > G.nextPoliceAt && G.state !== 'chase'){
+    p.active = true; p.t0 = t;
+    G.hBoots = au.play('boots', { loop:true, pan: (Math.random()<0.5?-1:1)*0.6, vol: 0 });
+    log('Heavy boots nearby — police patrol.');
+  }
+  if (p.active){
+    const e = t - p.t0;               // 0-4 in, 4-6.5 hold, 6.5-10.5 out
+    if      (e < 4)    p.prox = e/4;
+    else if (e < 6.5)  p.prox = 1;
+    else if (e < 10.5) p.prox = 1 - (e-6.5)/4;
+    else { p.active = false; p.prox = 0;
+           if (G.hBoots){ G.hBoots.stop(); G.hBoots = null; }
+           schedulePolice(); }
+    if (G.hBoots) G.hBoots.setVol(p.prox * 1.1);
+  }
+  const tag = $('policeTag');
+  if (p.prox > 0.45){ tag.textContent = 'police: CLOSE — don’t touch anyone'; tag.className = 'hot'; }
+  else if (p.prox > 0.05){ tag.textContent = 'police: nearby'; tag.className = ''; }
+  else { tag.textContent = 'police: far'; tag.className = ''; }
+}
+
+/* ---------- main loop ---------- */
+let tPrev = now();
+function tick(){
+  requestAnimationFrame(tick);
+  const t = now();
+  tPrev = t;
+  drawPad();
+  if (!G.running) return;
+  updatePolice(t);
+
+  const inp = ds.in;
+  const elapsed = t - G.tState;
+
+  switch (G.state){
+    case 'idle': {
+      timerBar(0);
+      ds.lightbar(0,90,140);
+      if (t > G.nextNpcAt && !(G.police.prox > 0.7)) spawnNpc();
+      break;
+    }
+    case 'approach': {
+      const prox = clamp(elapsed / APPROACH_DUR, 0, 1);
+      timerBar(prox, 'var(--info)');
+      ds.lightbar(200,120,0);
+      if (G.hJingle){
+        G.hJingle.setVol(0.12 + prox*0.85);
+        G.hJingle.setPan(G.side * lerp(0.95, 0.55, prox));
+      }
+      // haptic mirror: subtle pulsing rumble on the NPC side, growing with proximity
+      const pulse = 0.25 + 0.75 * Math.max(0, Math.sin(t * 2*Math.PI * 1.7));
+      const amt = prox * prox * 0.28 * pulse;
+      if (G.side < 0) ds.rumble(amt, 0); else ds.rumble(0, amt);
+      if (elapsed >= APPROACH_DUR){
+        setState('window');
+        prompt(`${sideArrow(G.side)} <b>BUMP ${sideName(G.side)}</b> ${sideArrow(G.side)}`, 'left stick — NOW');
+      }
+      break;
+    }
+    case 'window': {
+      timerBar(1 - elapsed/WINDOW_DUR, 'var(--good)');
+      ds.lightbar(0,200,60);
+      // sharp burst = "NOW", then near-silence so the burst stands out
+      const amt = elapsed < BURST_DUR ? 1 : 0.08;
+      if (G.side < 0) ds.rumble(amt, 0); else ds.rumble(0, amt);
+      if (inp.lx * G.side >= 0.6){ doBump(); break; }
+      if (elapsed >= WINDOW_DUR) npcPassed();
+      break;
+    }
+    case 'pickpocket': {
+      timerBar(1 - elapsed/PICK_DUR, 'var(--purple)');
+      if (elapsed >= PICK_DUR){ pickFailed(); break; }
+      const sameT = G.side < 0 ? inp.l2 : inp.r2;
+      const oppT  = G.side < 0 ? inp.r2 : inp.l2;
+      const same = G.side < 0 ? 'L2' : 'R2';
+      const opp  = G.side < 0 ? 'R2' : 'L2';
+      const rmag = Math.hypot(inp.rx, inp.ry);
+      let diff = 999;
+      if (rmag > 0.5){
+        let ang = Math.atan2(-inp.ry, inp.rx) * 180/Math.PI; if (ang < 0) ang += 360;
+        diff = Math.abs(ang - G.targetAngle); if (diff > 180) diff = 360 - diff;
+      }
+      if (G.pressed){
+        // stage 3: snatch — hit the opposite trigger
+        if (oppT > 0.55){ pickSuccess(); break; }
+      }
+      else if (!G.unlocked){
+        // stage 1: sweep the stick — the ONLY tell is the trigger going loose
+        ds.rumble(0,0);
+        if (rmag > 0.7 && diff <= ANGLE_TOL){
+          G.unlocked = true; G.tUnlock = t;
+          ds.triggerStiff(G.side < 0 ? 'l' : 'r', false);  // resistance releases = feel it
+          prompt(`<b style="color:var(--good)">There!</b> Press <b>${same}</b> all the way down`,
+                 'the trigger just went loose');
+        }
+      }
+      else {
+        // stage 2: angle found, trigger loose — press it fully before drifting off
+        ds.rumble(0,0);
+        if (diff > ANGLE_TOL*1.8){
+          // wandered off the angle before committing: it stiffens again
+          G.unlocked = false;
+          ds.triggerStiff(G.side < 0 ? 'l' : 'r', true);
+          prompt(`Lost it — sweep <b>right stick</b>, feel <b>${same}</b>`,
+                 `${same} loosens when you find the angle`);
+        }
+        else if (sameT > 0.75){
+          G.pressed = true;
+          ds.rumble(1,1); setTimeout(()=> ds.rumble(0,0), 120);
+          au.play('unlock', { pan: G.side*0.3, vol: 0.9 });
+          if (G.hScan) G.hScan.set(1600, 0);
+          prompt(`<b style="color:var(--good)">GOT IT — hit ${opp}!</b>`, 'quick, before they notice');
+        }
+      }
+      break;
+    }
+    case 'chase': {
+      timerBar(G.chaseRound / CHASE_ROUNDS, 'var(--bad)');
+      // flashing red lightbar
+      ds.lightbar((Math.sin(t*10)>0?220:60), 0, 0);
+      if (Math.abs(inp.lx) < 0.3) G.stickArmed = true;
+      if (G.chasePhase === 'gap'){
+        if (t >= G.chaseNext) chaseShout();
+      } else { // react
+        if (G.stickArmed && Math.abs(inp.lx) >= 0.6){
+          if (inp.lx * G.chaseSide < 0) chaseDodged();
+          else { chaseCaught('you ran straight into the officer'); break; }
+          G.stickArmed = false;
+        } else if (t >= G.chaseDeadline){
+          chaseCaught('too slow'); break;
+        }
+      }
+      break;
+    }
+  }
+}
+
+/* ---------- rendering ---------- */
+function lootTotal(){ return G.loot.reduce((s,[,v]) => s+v, 0); }
+function renderLoot(){
+  const ul = $('lootList'); ul.innerHTML = '';
+  for (let i = G.loot.length-1; i >= 0; i--){
+    const li = document.createElement('li');
+    li.textContent = `${G.loot[i][0]} — $${G.loot[i][1]}`;
+    ul.appendChild(li);
+  }
+  $('lootTotal').textContent = '$' + lootTotal();
+}
+function renderStats(){
+  $('stPicks').textContent = G.picks;
+  $('stEscapes').textContent = G.escapes;
+  $('stChase').textContent = G.state === 'chase' ? `${G.chaseRound}/${CHASE_ROUNDS}` : '—';
+}
+
+function drawStick(cv, x, y, extra){
+  const c = cv.getContext('2d'), w = cv.width, h = cv.height, cx = w/2, cy = h/2, R = w/2 - 8;
+  c.clearRect(0,0,w,h);
+  c.strokeStyle = '#262b33'; c.beginPath(); c.arc(cx,cy,R,0,7); c.stroke();
+  c.beginPath(); c.moveTo(cx-R,cy); c.lineTo(cx+R,cy); c.moveTo(cx,cy-R); c.lineTo(cx,cy+R);
+  c.strokeStyle = '#1a1e24'; c.stroke();
+  if (extra) extra(c, cx, cy, R);
+  c.fillStyle = '#4ca8e0';
+  c.beginPath(); c.arc(cx + x*R, cy + y*R, 6, 0, 7); c.fill();
+}
+function drawPad(){
+  drawStick($('cvL'), ds.in.lx, ds.in.ly);
+  drawStick($('cvR'), ds.in.rx, ds.in.ry, (c,cx,cy,R)=>{
+    if (G.state === 'pickpocket' && !G.pressed){
+      const a = -G.targetAngle * Math.PI/180;
+      c.strokeStyle = 'rgba(176,106,224,.8)'; c.lineWidth = 3;
+      c.beginPath();
+      c.arc(cx, cy, R, a - ANGLE_TOL*Math.PI/180, a + ANGLE_TOL*Math.PI/180);
+      c.stroke(); c.lineWidth = 1;
+    }
+  });
+  $('trigL2').firstElementChild.style.height = (ds.in.l2*100)+'%';
+  $('trigR2').firstElementChild.style.height = (ds.in.r2*100)+'%';
+  $('trigL2').classList.toggle('stiff', ds.out.lt[0] !== 0);
+  $('trigR2').classList.toggle('stiff', ds.out.rt[0] !== 0);
+}
+
+/* ---------- audio slot UI ---------- */
+function buildSlots(){
+  const wrap = $('slots');
+  for (const s of SLOT_DEFS){
+    const div = document.createElement('div');
+    div.className = 'slot';
+    div.dataset.slot = s.id;
+    div.innerHTML = `<label>${s.label} <span style="color:var(--dim)">(${s.id})</span></label>
+      <span class="src">synth placeholder</span>
+      <input type="file" accept="audio/*">`;
+    const input = div.querySelector('input');
+    const src = div.querySelector('.src');
+    input.addEventListener('change', async () => {
+      if (!input.files[0]) return;
+      au.init();
+      try {
+        await au.loadFile(s.id, input.files[0]);
+        src.textContent = input.files[0].name; src.className = 'src file';
+        log(`Loaded audio file for "${s.label}".`);
+        if (!s.loop) au.play(s.id, {vol:0.8});   // quick preview
+      } catch(e){ src.textContent = 'decode failed'; }
+    });
+    wrap.appendChild(div);
+  }
+}
+
+/* ---------- wiring ---------- */
+$('btnConnect').addEventListener('click', async () => {
+  if (!('hid' in navigator)){
+    alert('WebHID not available. Use Chrome or Edge, served from https:// or http://localhost.');
+    return;
+  }
+  au.init();
+  try { await ds.connect(); }
+  catch(e){ log('Connect failed/cancelled: ' + e.message); return; }
+  $('padStatus').textContent = 'DualSense · ' + (ds.bt ? 'Bluetooth' : 'USB');
+  $('padStatus').classList.add('on');
+  $('hidInfo').textContent = ds.device.productName + ' — output ' + (ds.bt ? '0x31 (BT, CRC32)' : '0x02 (USB)');
+  $('btnStart').disabled = false;
+  prompt('Ready.', 'press Start run (or ▶ Options on the controller)');
+  log('Controller connected over ' + (ds.bt ? 'Bluetooth' : 'USB') + '.', true);
+  ds.onchange = () => {
+    if (!ds.connected){
+      $('padStatus').textContent = 'disconnected'; $('padStatus').classList.remove('on');
+      $('btnStart').disabled = true;
+      log('Controller disconnected.', true);
+    }
+  };
+});
+
+$('btnStart').addEventListener('click', () => { $('overlay').style.display='none'; startRun(); });
+$('btnAgain').addEventListener('click', () => { $('overlay').style.display='none'; startRun(); });
+$('masterVol').addEventListener('input', e => au.setMaster(e.target.value/100));
+
+// Options button on the pad also starts a run
+setInterval(() => {
+  if (ds.connected && ds.in.btn.options && !G.running && !$('btnStart').disabled){
+    $('overlay').style.display='none'; startRun();
+  }
+}, 150);
+
+buildSlots();
+au.prefetchAssets((id, name) => {
+  const src = document.querySelector(`.slot[data-slot="${id}"] .src`);
+  if (src){ src.textContent = name; src.className = 'src file'; }
+  log(`Auto-loaded ${name}.`);
+});
+renderStats();
+requestAnimationFrame(tick);
+log('Pickpocket demo loaded. Connect your DualSense to begin.');
+</script>
+</body>
+</html>
