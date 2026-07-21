@@ -692,8 +692,9 @@ function pickSuccess(){
   const [name, val] = LOOT[Math.random()*LOOT.length|0];
   G.loot.push([name, val]); G.picks++;
   renderLoot(); renderStats();
-  au.play('success', { vol: 0.9 });
-  setTimeout(()=> au.speak(`You lifted ${name}. Worth ${val} dollars.`, {rate:1.02}), 250);
+  au.play('unlock', { pan: G.side*0.3, vol: 0.9 });
+  setTimeout(()=> au.play('success', { vol: 0.9 }), 200);
+  setTimeout(()=> au.speak(`You lifted ${name}. Worth ${val} dollars.`, {rate:1.02}), 500);
   setState('idle');
   prompt(`Got it: <b style="color:var(--good)">${name}</b>`, `+$${val} — keep moving`);
   log(`Lifted ${name} (+$${val}).`, true);
@@ -882,8 +883,6 @@ function tick(){
         else if (sameT > 0.75){
           G.pressed = true;
           ds.rumble(1,1); setTimeout(()=> ds.rumble(0,0), 120);
-          au.play('unlock', { pan: G.side*0.3, vol: 0.9 });
-          if (G.hScan) G.hScan.set(1600, 0);
           prompt(`<b style="color:var(--good)">GOT IT — hit ${opp}!</b>`, 'quick, before they notice');
         }
       }
