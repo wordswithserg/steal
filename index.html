@@ -585,8 +585,21 @@ const G = {
   hCrowd:null, hJingle:null, hBoots:null, hScan:null, hCrisis:null,
   // score
   loot: [], picks:0, escapes:0,
-  prevL2:0, prevR2:0,
+  prevL2:0, prevR2:0, prevTri:false,
 };
+
+/* triangle = spoken inventory check */
+function speakInventory(){
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  let text = 'Inventory. ';
+  if (!G.loot.length) text += 'Nothing yet.';
+  else {
+    text += G.loot.map(([n,v]) => `${n}, ${v} dollars`).join('. ') + '. ';
+    text += `Total stolen: ${lootTotal()} dollars.`;
+  }
+  au.speak(text, {rate:1.05});
+  log('Inventory check.');
+}
 
 const APPROACH_DUR = 5.0, WINDOW_DUR = 1.0, PICK_DUR = 5.0;
 const BURST_DUR = 0.18;   // strong haptic burst signalling "act now"
@@ -802,6 +815,10 @@ function tick(){
   const t = now();
   tPrev = t;
   drawPad();
+  if (ds.connected){
+    if (ds.in.btn.triangle && !G.prevTri) speakInventory();
+    G.prevTri = !!ds.in.btn.triangle;
+  }
   if (!G.running) return;
   updatePolice(t);
 
